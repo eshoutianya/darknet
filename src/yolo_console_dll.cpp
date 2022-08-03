@@ -267,11 +267,12 @@ void draw_boxes(cv::Mat mat_img, std::vector<bbox_t> result_vec, std::vector<std
            //sports ball坐标终端窗口输出20220729
            obj_ball_cap=true;
            std::cout << obj_names[i.obj_id] << " - ";
-           std::cout << "obj_id = " << i.obj_id << ",  x = " << i.x_3d << ", y = " << i.y_3d
-                        << ", z = " << i.z_3d 
+           std::cout << "obj_id = " << i.obj_id << ",  x = " << i.x_3d << ", y = " << i.z_3d
+                        << ", z = " <<  -i.y_3d
              << std::setprecision(3) << ", prob = " << obj_ball_cap << std::endl;
             //sports ball坐标socket发布20220729 
-            socket_pub( i.x_3d, i.y_3d,  i.z_3d);
+            //socket_pub( i.x_3d, i.y_3d,  i.z_3d);
+            socket_pub( i.x_3d, i.z_3d,  -i.y_3d); //坐标变换：面朝摄像头，左侧为x正，背后为y正，向上为z正，相机正中间为坐标原点
             //socket_pub( 0.5, 0, -0.5); //UDP test
         }
         
