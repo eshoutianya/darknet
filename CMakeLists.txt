@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.10)
 include(CMakeDependentOption)
 
 set(Darknet_MAJOR_VERSION 0)
@@ -378,10 +378,12 @@ endif()
 
 #look for all *.c files in src folder
 file(GLOB sources "${CMAKE_CURRENT_LIST_DIR}/src/*.c")
+
 #add also .cpp files
 list(APPEND sources
   ${CMAKE_CURRENT_LIST_DIR}/src/http_stream.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/image_opencv.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/tcplink.cpp
 )
 #remove darknet.c file which is necessary only for the executable, not for the lib
 list(REMOVE_ITEM sources
@@ -602,3 +604,5 @@ endif()
 if(ENABLE_CSHARP_WRAPPER)
   add_subdirectory(src/csharp)
 endif()
+
+

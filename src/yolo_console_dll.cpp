@@ -9,7 +9,60 @@
 #include <atomic>
 #include <mutex>         // std::mutex, std::unique_lock
 #include <cmath>
-
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <cstring>
+#include <typeinfo> 
+using namespace std;
+//创建新的套接字之前需要调用一个引入Ws2_32.dll库的函数,否则服务器和客户端连接不上
+#pragma comment(lib,"ws2_32.lib")
+//定义发送和接受的结构
+/* struct TEST
+{
+	int test;
+};  */
+struct INFO
+{
+	double  dodgeball_x;
+    double  dodgeball_y;
+    double  dodgeball_z;
+	int year;
+    int month;
+	int day;
+	//TEST test_struct;
+    //double temperature;
+};
+//dodgeball已捕获标志
+bool obj_ball_cap=false;
+//创建发送和接受的结构体以及转化时用到的字符串，用作测试
+INFO sendinfo,recvinfo;
+char send_info_buf[100], recv_info_buf[100];
+//创建发送和接受的字符串，用作测试
+char sendbuf[100]= "How are you?", recvbuf[100];
+//socket发送函数
+void socket_pub(double ball_x, double ball_y, double ball_z)
+{	
+  	//对发送的结构体成员赋值
+    sendinfo.dodgeball_x=ball_x;
+    sendinfo.dodgeball_y=ball_y;
+    sendinfo.dodgeball_z=ball_z;
+	sendinfo.year = 2021;
+	sendinfo.month = 7;
+	sendinfo.day = 27;
+	//sendinfo.test_struct.test = 10;
+	//sendinfo.temperature = 23.50;
+	//将发送的结构体sendinfo转化为字符串send_info_buf
+	memcpy(send_info_buf, &sendinfo, sizeof(sendinfo));
+    //结构体发送和打印所用语句
+	
+}
+//
 
 // It makes sense only for video-Camera (not for video-File)
 // To use - uncomment the following line. Optical-flow is supported only by OpenCV 3.x - 4.x
@@ -43,6 +96,7 @@ float getMedian(std::vector<float> &v) {
     return v[n];
 }
 
+//获取三维坐标函数
 std::vector<bbox_t> get_3d_coordinates(std::vector<bbox_t> bbox_vect, cv::Mat xyzrgba)
 {
     bool valid_measure;
@@ -208,11 +262,25 @@ void draw_boxes(cv::Mat mat_img, std::vector<bbox_t> result_vec, std::vector<std
             putText(mat_img, obj_name, cv::Point2f(i.x, i.y - 16), cv::FONT_HERSHEY_COMPLEX_SMALL, 1.2, cv::Scalar(0, 0, 0), 2);
             if(!coords_3d.empty()) putText(mat_img, coords_3d, cv::Point2f(i.x, i.y-1), cv::FONT_HERSHEY_COMPLEX_SMALL, 0.8, cv::Scalar(0, 0, 0), 1);
         }
+        //sports ball坐标终端窗口输出20220729
+        if(obj_names[i.obj_id] =="sports ball"){
+           //sports ball坐标终端窗口输出20220729
+           obj_ball_cap=true;
+           std::cout << obj_names[i.obj_id] << " - ";
+           std::cout << "obj_id = " << i.obj_id << ",  x = " << i.x_3d << ", y = " << i.y_3d
+                        << ", z = " << i.z_3d 
+             << std::setprecision(3) << ", prob = " << obj_ball_cap << std::endl;
+            //sports ball坐标socket发布20220729 
+            socket_pub( i.x_3d, i.y_3d,  i.z_3d);
+            //socket_pub( 0.5, 0, -0.5); //UDP test
+        }
+        
     }
     if (current_det_fps >= 0 && current_cap_fps >= 0) {
         std::string fps_str = "FPS detection: " + std::to_string(current_det_fps) + "   FPS capture: " + std::to_string(current_cap_fps);
         putText(mat_img, fps_str, cv::Point2f(10, 20), cv::FONT_HERSHEY_COMPLEX_SMALL, 1.2, cv::Scalar(50, 255, 0), 2);
     }
+
 }
 #endif    // OPENCV
 
@@ -275,6 +343,30 @@ int main(int argc, char *argv[])
     std::string  cfg_file = "cfg/yolov3.cfg";
     std::string  weights_file = "yolov3.weights";
     std::string filename;
+
+    //*socket-UDP初始化*****************************************************************************************************//
+	struct sockaddr_in Server;				//创建服务端sockaddr_in结构体
+	//建立一个数据报类型的UDP套接字  ******************//
+	int serverSocket = socket(PF_INET, SOCK_DGRAM, 0); //配置模式，
+	//设置服务器地址addrSrv和监听端口
+	Server.sin_family = AF_INET;
+	Server.sin_addr.s_addr = inet_addr("127.0.0.1"); //设置服务器主机ip地址（与接收方客户端的IP对应）
+	Server.sin_port = htons(8001);					 //发送用的端口，可以根据需要更改
+
+
+	//使用bind（）函数绑定监听端口，将socket文件描述符sockSrv与地址类型变量（struct sockaddr_in ）进行绑定
+	//int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+	bind(serverSocket, (sockaddr *)&Server, sizeof(sockaddr));
+
+	//*************************************************************************************************************//
+	struct sockaddr_in Client;				//创建客户端sockaddr_in结构体
+	int clientSocket = socket(PF_INET, SOCK_DGRAM, 0); //配置模式，
+	Client.sin_family = AF_INET;
+    Client.sin_addr.s_addr = inet_addr("127.0.0.3");
+	//Client.sin_addr.s_addr = inet_addr("192.168.0.15");
+	Client.sin_port = htons(8001);
+
+//************************************************************************************************************//
 
     if (argc > 4) {    //voc.names yolo-voc.cfg yolo-voc.weights test.mp4
         names_file = argv[1];
@@ -559,7 +651,14 @@ int main(int argc, char *argv[])
                         //small_preview.set(draw_frame, result_vec);
                         //large_preview.set(draw_frame, result_vec);
                         draw_boxes(draw_frame, result_vec, obj_names, current_fps_det, current_fps_cap);
-                        //show_console_result(result_vec, obj_names, detection_data.frame_id);
+                        //socket数据发送
+                        if(obj_ball_cap==true){
+                            int t = sendto(clientSocket, send_info_buf, sizeof(send_info_buf)+1  , 0, (sockaddr*)&Client, sizeof(Client));
+	                        cout << "sendto_len:  "<<t << endl<< endl;//若发送失败。则返回-1
+                            obj_ball_cap=false;
+                        }
+                        //socket数据发送
+                        // show_console_result(result_vec, obj_names, detection_data.frame_id);
                         //large_preview.draw(draw_frame);
                         //small_preview.draw(draw_frame, true);
 
@@ -633,7 +732,7 @@ int main(int argc, char *argv[])
                     if (key == 'p') while (true) if (cv::waitKey(100) == 'p') break;
                     //if (key == 'e') extrapolate_flag = !extrapolate_flag;
                     if (key == 27) { exit_flag = true;}
-
+                   
                     //std::cout << " current_fps_det = " << current_fps_det << ", current_fps_cap = " << current_fps_cap << std::endl;
                 } while (!detection_data.exit_flag);
                 std::cout << " show detection exit \n";
@@ -678,6 +777,7 @@ int main(int argc, char *argv[])
 
                 //result_vec = detector.tracking_id(result_vec);    // comment it - if track_id is not required
                 draw_boxes(mat_img, result_vec, obj_names);
+                
                 cv::imshow("window name", mat_img);
                 show_console_result(result_vec, obj_names);
                 cv::waitKey(0);
